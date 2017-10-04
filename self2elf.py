@@ -1,7 +1,11 @@
 #!/usr/bin/python
 
 import sys
-from sceutils import *
+import zlib
+from scetypes import *
+from sceutils import get_keys
+from Crypto.Cipher import AES
+from Crypto.Util import Counter
 
 def self2elf(inf, outf=DevNull(), silent=False):
   dat = inf.read(SceHeader.Size)
