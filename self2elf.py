@@ -1,13 +1,14 @@
 #!/usr/bin/python
 
+import os
 import sys
 import zlib
 import sceutils
-from scetypes import DevNull, SecureBool, SceHeader, SelfHeader, AppInfoHeader, ElfHeader, ElfPhdr, SegmentInfo
+from scetypes import SecureBool, SceHeader, SelfHeader, AppInfoHeader, ElfHeader, ElfPhdr, SegmentInfo
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
 
-def self2elf(inf, outf=DevNull(), silent=False):
+def self2elf(inf, outf=open(os.devnull, "w"), silent=False):
     sce = SceHeader(inf.read(SceHeader.Size))
     if not silent:
         print sce

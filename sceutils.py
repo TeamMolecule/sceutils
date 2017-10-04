@@ -23,7 +23,8 @@ def get_keys(inf, sce_hdr, sysver, self_type=SelfType.NONE, silent=False):
     if not silent:
         print metadata_hdr
     keymap = {}
-    vault = [dec[MetadataHeader.Size + metadata_hdr.section_count*MetadataSection.Size + 16*i:MetadataHeader.Size + metadata_hdr.section_count*MetadataSection.Size + 16*i + 16] for i in range(metadata_hdr.key_count)]
+    start = MetadataHeader.Size + metadata_hdr.section_count * MetadataSection.Size
+    vault = [dec[start + 16 * x:start + 16 * (x + 1)] for x in xrange(metadata_hdr.key_count)]
     for i in range(metadata_hdr.section_count):
         metsec = MetadataSection(dec[MetadataHeader.Size + i*MetadataSection.Size:MetadataHeader.Size + i*MetadataSection.Size + MetadataSection.Size])
         if not silent:

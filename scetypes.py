@@ -5,6 +5,8 @@ from enum import Enum
 
 SCE_MAGIC = 0x00454353
 
+KeyEntry = namedtuple('KeyEntry', ['minver', 'maxver', 'keyrev', 'key', 'iv'])
+
 class SceType(Enum):
     SELF = 1
     SRVK = 2
@@ -29,17 +31,17 @@ class SecureBool(Enum):
     YES = 2
 
 class KeyStore:
-    _store = defaultdict(lambda: defaultdict(list))
+    def __init__(self):
+        self._store = defaultdict(lambda: defaultdict(list))
 
     def register(self, scetype, keyrev, key, iv, minver=0, maxver=0xffffffffffffffff, selftype=SelfType.NONE):
-        KeyEntry = namedtuple('KeyEntry', ['minver', 'maxver', 'keyrev', 'key', 'iv'])
         self._store[scetype][selftype].append(KeyEntry(minver, maxver, keyrev, binascii.a2b_hex(key), binascii.a2b_hex(iv)))
 
     def get(self, scetype, sysver, keyrev=-1, selftype=SelfType.NONE):
         if scetype not in self._store:
-            raise KeyError("Cannot any keys for this SCE type")
+            raise KeyError("Cannot find any keys for this SCE type")
         if selftype not in self._store[scetype]:
-            raise KeyError("Cannot any keys for this SELF type")
+            raise KeyError("Cannot find any keys for this SELF type")
         for item in self._store[scetype][selftype]:
             if sysver >= item.minver and sysver <= item.maxver and (keyrev < 0 or keyrev == item.keyrev):
                 return (item.key, item.iv)
@@ -272,7 +274,3 @@ class MetadataSection:
         ret += '   iv_idx:         0x{0:X}\n'.format(self.iv_idx)
         ret += '   compressed:     0x{0:X}'.format(self.compressed)
         return ret
-
-class DevNull: 
-    def write(self, str): 
-        pass
