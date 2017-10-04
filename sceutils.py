@@ -11,7 +11,7 @@ def get_keys(inf, sce_hdr, sysver, self_type=SelfType.NONE, silent=False):
     from keys import SCE_KEYS
     inf.seek(sce_hdr.metadata_offset + 48)
     dat = inf.read(sce_hdr.header_length - sce_hdr.metadata_offset - 48)
-    (key, iv) = SCE_KEYS.get(sce_hdr.sce_type, sysver, self_type)
+    (key, iv) = SCE_KEYS.get(sce_hdr.sce_type, sysver, sce_hdr.key_revision, self_type)
     hdr_dec = AES.new(key, AES.MODE_CBC, iv)
     dec = hdr_dec.decrypt(dat[0:MetadataInfo.Size])
     metadata_info = MetadataInfo(dec)

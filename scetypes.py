@@ -1,3 +1,4 @@
+import binascii
 import struct
 from enum import Enum
 
@@ -12,9 +13,9 @@ class SceType(Enum):
 class SelfType(Enum):
     NONE = 0
     KERNEL = 0x07
-    FSELF = 0x08
+    APP = 0x08
+    BOOT = 0x09
     SECURE = 0x0B
-    BOOT = 0x0C
     USER = 0x0D
 
 class SelfPlatform(Enum):
@@ -22,27 +23,28 @@ class SelfPlatform(Enum):
     VITA = 0x40
 
 class SecureBool(Enum):
+    UNUSED = 0
     NO = 1
     YES = 2
 
 class KeyStore:
     _store = {}
 
-    def register(self, scetype, key, iv, minver=0, maxver=0xffffffffffffffff, selftype=SelfType.NONE):
+    def register(self, scetype, keyrev, key, iv, minver=0, maxver=0xffffffffffffffff, selftype=SelfType.NONE):
         if scetype not in self._store:
             self._store[scetype] = {}
         if selftype not in self._store[scetype]:
             self._store[scetype][selftype] = []
-        self._store[scetype][selftype].append((minver, maxver, key, iv))
+        self._store[scetype][selftype].append((minver, maxver, keyrev, binascii.a2b_hex(key), binascii.a2b_hex(iv)))
 
-    def get(self, scetype, sysver, selftype=SelfType.NONE):
+    def get(self, scetype, sysver, keyrev=-1, selftype=SelfType.NONE):
         if scetype not in self._store:
             raise KeyError("Cannot any keys for this SCE type")
         if selftype not in self._store[scetype]:
             raise KeyError("Cannot any keys for this SELF type")
         for item in self._store[scetype][selftype]:
-            if sysver >= item[0] and sysver <= item[1]:
-                return (item[2], item[3])
+            if sysver >= item[0] and sysver <= item[1] and (keyrev < 0 or keyrev == item[2]):
+                return (item[3], item[4])
         raise KeyError("Cannot find key/iv for this SCE file")
 
 class SceHeader:
@@ -52,7 +54,7 @@ class SceHeader:
             self.magic, 
             self.version, 
             platform, 
-            self.key_version, 
+            self.key_revision, 
             sce_type, 
             self.metadata_offset, 
             self.header_length, 
@@ -70,7 +72,7 @@ class SceHeader:
         ret += 'SCE Header:\n'
         ret += ' Version:          {0}\n'.format(self.version)
         ret += ' Platform:         {0}\n'.format(self.platform)
-        ret += ' Key Version:      0x{0:X}\n'.format(self.key_version)
+        ret += ' Key Revision:     0x{0:X}\n'.format(self.key_revision)
         ret += ' SCE Type:         {0}\n'.format(self.sce_type)
         ret += ' Metadata Offset:  0x{0:X}\n'.format(self.metadata_offset)
         ret += ' Header Length:    0x{0:X}\n'.format(self.header_length)
