@@ -23,7 +23,7 @@ def scedecrypt(inf, outdir, decompress=True, silent=False):
         ctr = Counter.new(128, initial_value=long(sceseg.iv.encode("hex"), 16))
         section_aes = AES.new(sceseg.key, AES.MODE_CTR, counter=ctr)
         dat = section_aes.decrypt(dat)
-        if sceseg.compressed:
+        if decompress and sceseg.compressed:
             if not silent:
                 print 'Decompressing segment {0}...'.format(i)
             z = zlib.decompressobj()
