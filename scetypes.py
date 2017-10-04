@@ -6,6 +6,7 @@ from enum import Enum
 SCE_MAGIC = 0x00454353
 
 KeyEntry = namedtuple('KeyEntry', ['minver', 'maxver', 'keyrev', 'key', 'iv'])
+SceSegment = namedtuple('SceSegment', ['offset', 'size', 'compressed', 'key', 'iv'])
 
 class SceType(Enum):
     SELF = 1
@@ -25,10 +26,52 @@ class SelfPlatform(Enum):
     PS3 = 0
     VITA = 0x40
 
+class SkpgType(Enum):
+    TYPE_0 = 0x0
+    OS0 = 0x1
+    TYPE_2 = 0x2
+    TYPE_3 = 0x3
+    PERMISSIONS_4 = 0x4
+    TYPE_5 = 0x5
+    TYPE_6 = 0x6
+    TYPE_7 = 0x7
+    SYSCON_8 = 0x8
+    BOOT = 0x9
+    VS0 = 0xA
+    CPFW = 0xB
+    MOTION_C = 0xC
+    BBMC_D = 0xD
+    TYPE_E = 0xE
+    MOTION_F = 0xF
+    TOUCH_10 = 0x10
+    TOUCH_11 = 0x11
+    SYSCON_12 = 0x12
+    SYSCON_13 = 0x13
+    SYSCON_14 = 0x14
+    TYPE_15 = 0x15
+    VS0_TAR_PATCH = 0x16
+    SA0 = 0x17
+    PD0 = 0x18
+    SYSCON_19 = 0x19
+    TYPE_1A = 0x1A
+    PSPEMU_LIST = 0x1B
+
 class SecureBool(Enum):
     UNUSED = 0
     NO = 1
     YES = 2
+
+class EncryptionType(Enum):
+    NONE = 1
+    AES128CTR = 3
+
+class HashType(Enum):
+    NONE = 1
+    AES256 = 6
+
+class CompressionType(Enum):
+    NONE = 1
+    DEFLATE = 2
 
 class KeyStore:
     def __init__(self):
@@ -37,13 +80,13 @@ class KeyStore:
     def register(self, scetype, keyrev, key, iv, minver=0, maxver=0xffffffffffffffff, selftype=SelfType.NONE):
         self._store[scetype][selftype].append(KeyEntry(minver, maxver, keyrev, binascii.a2b_hex(key), binascii.a2b_hex(iv)))
 
-    def get(self, scetype, sysver, keyrev=-1, selftype=SelfType.NONE):
+    def get(self, scetype, sysver=-1, keyrev=-1, selftype=SelfType.NONE):
         if scetype not in self._store:
             raise KeyError("Cannot find any keys for this SCE type")
         if selftype not in self._store[scetype]:
             raise KeyError("Cannot find any keys for this SELF type")
         for item in self._store[scetype][selftype]:
-            if sysver >= item.minver and sysver <= item.maxver and (keyrev < 0 or keyrev == item.keyrev):
+            if (sysver < 0 or (sysver >= item.minver and sysver <= item.maxver)) and (keyrev < 0 or keyrev == item.keyrev):
                 return (item.key, item.iv)
         raise KeyError("Cannot find key/iv for this SCE file")
 
@@ -252,13 +295,16 @@ class MetadataSection:
             self.size, 
             self.type, 
             self.seg_idx, 
-            self.hashed, 
+            hashtype, 
             self.hash_idx, 
-            self.encrypted, 
+            encryption, 
             self.key_idx, 
             self.iv_idx, 
-            self.compressed
-        ) = struct.unpack('<QQIIIIIIII', data)
+            compression
+        ) = struct.unpack('<QQIiIiIiiI', data)
+        self.hash = HashType(hashtype)
+        self.encryption = EncryptionType(encryption)
+        self.compression = CompressionType(compression)
 
     def __str__(self):
         ret = ''
@@ -266,11 +312,88 @@ class MetadataSection:
         ret += '   offset:         0x{0:X}\n'.format(self.offset)
         ret += '   size:           0x{0:X}\n'.format(self.size)
         ret += '   type:           0x{0:X}\n'.format(self.type)
-        ret += '   seg_idx:        0x{0:X}\n'.format(self.seg_idx)
-        ret += '   hashed:         0x{0:X}\n'.format(self.hashed)
-        ret += '   hash_idx:       0x{0:X}\n'.format(self.hash_idx)
-        ret += '   encrypted:      0x{0:X}\n'.format(self.encrypted)
-        ret += '   key_idx:        0x{0:X}\n'.format(self.key_idx)
-        ret += '   iv_idx:         0x{0:X}\n'.format(self.iv_idx)
-        ret += '   compressed:     0x{0:X}'.format(self.compressed)
+        ret += '   seg_idx:        {0}\n'.format(self.seg_idx)
+        ret += '   hash:           {0}\n'.format(self.hash)
+        ret += '   hash_idx:       {0}\n'.format(self.hash_idx)
+        ret += '   encryption:     {0}\n'.format(self.encryption)
+        ret += '   key_idx:        {0}\n'.format(self.key_idx)
+        ret += '   iv_idx:         {0}\n'.format(self.iv_idx)
+        ret += '   compression:    {0}'.format(self.compression)
+        return ret
+
+class SrvkHeader:
+    Size = 32
+    def __init__(self, data):
+        (
+            self.field_0, 
+            self.field_4, 
+            self.sys_version, 
+            self.field_10, 
+            self.field_14, 
+            self.field_18, 
+            self.field_1C
+        ) = struct.unpack('<IIQIIII', data)
+
+    def __str__(self):
+        ret = ''
+        ret += 'SRVK Header:\n'
+        ret += ' field_0:          0x{0:X}\n'.format(self.field_0)
+        ret += ' field_4:          0x{0:X}\n'.format(self.field_4)
+        ret += ' sys_version:      0x{0:X}\n'.format(self.sys_version)
+        ret += ' field_10:         0x{0:X}\n'.format(self.field_10)
+        ret += ' field_14:         0x{0:X}\n'.format(self.field_14)
+        ret += ' field_18:         0x{0:X}\n'.format(self.field_18)
+        ret += ' field_1C:         0x{0:X}\n'.format(self.field_1C)
+        return ret
+
+class SpkgHeader:
+    Size = 128
+    def __init__(self, data):
+        (
+            self.field_0, 
+            pkg_type, 
+            self.flags, 
+            self.field_C, 
+            self.update_version, 
+            self.final_size, 
+            self.decrypted_size, 
+            self.field_28, 
+            self.field_30, 
+            self.field_34, 
+            self.field_38, 
+            self.field_3C, 
+            self.field_40, 
+            self.field_48, 
+            self.offset, 
+            self.size, 
+            self.part_idx, 
+            self.total_parts, 
+            self.field_70, 
+            self.field_78
+        ) = struct.unpack('<IIIIQQQQIIIIQQQQQQQQ', data)
+        self.type = SkpgType(pkg_type)
+
+    def __str__(self):
+        ret = ''
+        ret += 'SPKG Header:\n'
+        ret += ' field_0:          0x{0:X}\n'.format(self.field_0)
+        ret += ' type:             {0}\n'.format(self.type)
+        ret += ' flags:            0x{0:X}\n'.format(self.flags)
+        ret += ' field_C:          0x{0:X}\n'.format(self.field_C)
+        ret += ' update_version:   0x{0:X}\n'.format(self.update_version)
+        ret += ' final_size:       0x{0:X}\n'.format(self.final_size)
+        ret += ' decrypted_size:   0x{0:X}\n'.format(self.decrypted_size)
+        ret += ' field_28:         0x{0:X}\n'.format(self.field_28)
+        ret += ' field_30:         0x{0:X}\n'.format(self.field_30)
+        ret += ' field_34:         0x{0:X}\n'.format(self.field_34)
+        ret += ' field_38:         0x{0:X}\n'.format(self.field_38)
+        ret += ' field_3C:         0x{0:X}\n'.format(self.field_3C)
+        ret += ' field_40:         0x{0:X}\n'.format(self.field_40)
+        ret += ' field_48:         0x{0:X}\n'.format(self.field_48)
+        ret += ' offset:           0x{0:X}\n'.format(self.offset)
+        ret += ' size:             0x{0:X}\n'.format(self.size)
+        ret += ' part_idx:         0x{0:X}\n'.format(self.part_idx)
+        ret += ' total_parts:      0x{0:X}\n'.format(self.total_parts)
+        ret += ' field_70:         0x{0:X}\n'.format(self.field_70)
+        ret += ' field_78:         0x{0:X}\n'.format(self.field_78)
         return ret

@@ -50,9 +50,9 @@ def self2elf(inf, outf=open(os.devnull, "w"), silent=False):
             encrypted = True
     # get keys
     if encrypted:
-        keys = sceutils.get_keys(inf, sce, appinfo_hdr.sys_version, appinfo_hdr.self_type, silent)
+        scesegs = sceutils.get_segments(inf, sce, appinfo_hdr.sys_version, appinfo_hdr.self_type, silent)
     else:
-        keys = {}
+        scesegs = {}
     # generate ELF
     for i in range(elf_hdr.e_phnum):
         if elf_phdrs[i].p_filesz == 0:
@@ -70,9 +70,8 @@ def self2elf(inf, outf=open(os.devnull, "w"), silent=False):
         dat = inf.read(segment_infos[i].size)
         # encryption
         if segment_infos[i].plaintext == SecureBool.NO:
-            (key, iv) = keys[i]
-            ctr = Counter.new(128, initial_value=long(iv.encode("hex"), 16))
-            section_aes = AES.new(key, AES.MODE_CTR, counter=ctr)
+            ctr = Counter.new(128, initial_value=long(scesegs[i].iv.encode("hex"), 16))
+            section_aes = AES.new(scesegs[i].key, AES.MODE_CTR, counter=ctr)
             dat = section_aes.decrypt(dat)
         # compression
         if segment_infos[i].compressed == SecureBool.YES:
