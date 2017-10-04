@@ -1,6 +1,6 @@
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
-from scetypes import *
+from scetypes import SelfType, MetadataInfo, MetadataHeader, MetadataSection
 
 def print_metadata_keyvault(keys):
     print 'Metadata Vault:'

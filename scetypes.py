@@ -1,5 +1,6 @@
 import binascii
 import struct
+from collections import defaultdict, namedtuple
 from enum import Enum
 
 SCE_MAGIC = 0x00454353
@@ -28,14 +29,11 @@ class SecureBool(Enum):
     YES = 2
 
 class KeyStore:
-    _store = {}
+    _store = defaultdict(lambda: defaultdict(list))
 
     def register(self, scetype, keyrev, key, iv, minver=0, maxver=0xffffffffffffffff, selftype=SelfType.NONE):
-        if scetype not in self._store:
-            self._store[scetype] = {}
-        if selftype not in self._store[scetype]:
-            self._store[scetype][selftype] = []
-        self._store[scetype][selftype].append((minver, maxver, keyrev, binascii.a2b_hex(key), binascii.a2b_hex(iv)))
+        KeyEntry = namedtuple('KeyEntry', ['minver', 'maxver', 'keyrev', 'key', 'iv'])
+        self._store[scetype][selftype].append(KeyEntry(minver, maxver, keyrev, binascii.a2b_hex(key), binascii.a2b_hex(iv)))
 
     def get(self, scetype, sysver, keyrev=-1, selftype=SelfType.NONE):
         if scetype not in self._store:
@@ -43,8 +41,8 @@ class KeyStore:
         if selftype not in self._store[scetype]:
             raise KeyError("Cannot any keys for this SELF type")
         for item in self._store[scetype][selftype]:
-            if sysver >= item[0] and sysver <= item[1] and (keyrev < 0 or keyrev == item[2]):
-                return (item[3], item[4])
+            if sysver >= item.minver and sysver <= item.maxver and (keyrev < 0 or keyrev == item.keyrev):
+                return (item.key, item.iv)
         raise KeyError("Cannot find key/iv for this SCE file")
 
 class SceHeader:

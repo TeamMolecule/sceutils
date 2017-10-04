@@ -2,21 +2,18 @@
 
 import sys
 import zlib
-from scetypes import *
-from sceutils import get_keys
+import sceutils
+from scetypes import DevNull, SecureBool, SceHeader, SelfHeader, AppInfoHeader, ElfHeader, ElfPhdr, SegmentInfo
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
 
 def self2elf(inf, outf=DevNull(), silent=False):
-    dat = inf.read(SceHeader.Size)
-    sce = SceHeader(dat)
+    sce = SceHeader(inf.read(SceHeader.Size))
     if not silent:
         print sce
-    dat = inf.read(SelfHeader.Size)
-    self_hdr = SelfHeader(dat)
+    self_hdr = SelfHeader(inf.read(SelfHeader.Size))
     inf.seek(self_hdr.appinfo_offset)
-    dat = inf.read(AppInfoHeader.Size)
-    appinfo_hdr = AppInfoHeader(dat)
+    appinfo_hdr = AppInfoHeader(inf.read(AppInfoHeader.Size))
     if not silent:
         print appinfo_hdr
     # copy elf header
@@ -44,8 +41,7 @@ def self2elf(inf, outf=DevNull(), silent=False):
         at += ElfPhdr.Size
         # seg info
         inf.seek(self_hdr.segment_info_offset + i*SegmentInfo.Size)
-        dat = inf.read(SegmentInfo.Size)
-        segment_info = SegmentInfo(dat)
+        segment_info = SegmentInfo(inf.read(SegmentInfo.Size))
         if not silent:
             print segment_info
         segment_infos.append(segment_info)
@@ -53,7 +49,7 @@ def self2elf(inf, outf=DevNull(), silent=False):
             encrypted = True
     # get keys
     if encrypted:
-        keys = get_keys(inf, sce, appinfo_hdr.sys_version, appinfo_hdr.self_type, silent)
+        keys = sceutils.get_keys(inf, sce, appinfo_hdr.sys_version, appinfo_hdr.self_type, silent)
     else:
         keys = {}
     # generate ELF
@@ -66,7 +62,7 @@ def self2elf(inf, outf=DevNull(), silent=False):
         pad_len = elf_phdrs[i].p_offset - at
         if pad_len < 0:
             raise RuntimeError("ELF p_offset invalid!")
-        outf.write(bytearray([0] * pad_len))
+        outf.write(b"\x00" * pad_len)
         at += pad_len
         # data
         inf.seek(segment_infos[i].offset)
