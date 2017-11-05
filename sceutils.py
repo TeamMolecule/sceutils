@@ -14,6 +14,9 @@ def get_segments(inf, sce_hdr, sysver=-1, self_type=SelfType.NONE, keytype=0, kl
     (key, iv) = SCE_KEYS.get(KeyType.METADATA, sce_hdr.sce_type, sysver, sce_hdr.key_revision, self_type)
     hdr_dec = AES.new(key, AES.MODE_CBC, iv)
     if self_type == SelfType.APP:
+        keytype = 0
+        if sce_hdr.key_revision >= 2:
+            keytype=1
         (np_key, np_iv) = SCE_KEYS.get(KeyType.NPDRM, sce_hdr.sce_type, sysver, keytype, self_type)
         npdrm_dec = AES.new(np_key, AES.MODE_CBC, np_iv)
         #klickey = klictxt.encode("hex")
