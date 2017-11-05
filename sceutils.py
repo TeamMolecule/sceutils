@@ -1,19 +1,32 @@
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
-from scetypes import SecureBool, SceType, SelfType, SceSegment, SelfHeader, AppInfoHeader, MetadataInfo, MetadataHeader, MetadataSection, SrvkHeader, SpkgHeader, CompressionType, EncryptionType
+from scetypes import SecureBool, SceType, KeyType, SelfType, SceSegment, SelfHeader, AppInfoHeader, MetadataInfo, MetadataHeader, MetadataSection, SrvkHeader, SpkgHeader, CompressionType, EncryptionType
 
 def print_metadata_keyvault(keys):
     print ' Metadata Vault:'
     for i in range(len(keys)):
-        print '  {0:2}:              {1}'.format(i, keys[i].encode("hex"))
+        print '  {0:#0{1}x}:      {2}'.format(i,4, keys[i].encode("hex"))
 
-def get_segments(inf, sce_hdr, sysver=-1, self_type=SelfType.NONE, silent=False):
+def get_segments(inf, sce_hdr, sysver=-1, self_type=SelfType.NONE, keytype=0, klictxt=0, silent=False):
     from keys import SCE_KEYS
     inf.seek(sce_hdr.metadata_offset + 48)
     dat = inf.read(sce_hdr.header_length - sce_hdr.metadata_offset - 48)
-    (key, iv) = SCE_KEYS.get(sce_hdr.sce_type, sysver, sce_hdr.key_revision, self_type)
+    (key, iv) = SCE_KEYS.get(KeyType.METADATA, sce_hdr.sce_type, sysver, sce_hdr.key_revision, self_type)
     hdr_dec = AES.new(key, AES.MODE_CBC, iv)
-    dec = hdr_dec.decrypt(dat[0:MetadataInfo.Size])
+    if self_type == SelfType.APP:
+        (np_key, np_iv) = SCE_KEYS.get(KeyType.NPDRM, sce_hdr.sce_type, sysver, keytype, self_type)
+        npdrm_dec = AES.new(np_key, AES.MODE_CBC, np_iv)
+        #klickey = klictxt.encode("hex")
+        #print klictxt.encode("hex")
+        predec = npdrm_dec.decrypt(klictxt)
+        #print predec.encode("hex")
+        npdrm_dec2 = AES.new(predec, AES.MODE_CBC, np_iv)
+        dec_in = npdrm_dec2.decrypt(dat[0:MetadataInfo.Size])
+    else:
+        dec_in = dat[0:MetadataInfo.Size]
+        
+          
+    dec = hdr_dec.decrypt(dec_in)
     metadata_info = MetadataInfo(dec)
     if not silent:
         print metadata_info
@@ -32,7 +45,7 @@ def get_segments(inf, sce_hdr, sysver=-1, self_type=SelfType.NONE, silent=False)
         if not silent:
             print metsec
         if metsec.encryption == EncryptionType.AES128CTR:
-            segs[metsec.seg_idx] = SceSegment(metsec.offset, metsec.size, metsec.compression == CompressionType.DEFLATE, vault[metsec.key_idx], vault[metsec.iv_idx])
+            segs[i] = SceSegment(metsec.offset, metsec.seg_idx, metsec.size, metsec.compression == CompressionType.DEFLATE, vault[metsec.key_idx], vault[metsec.iv_idx])
     return segs
 
 def get_key_type(inf, sce_hdr, silent=False):
