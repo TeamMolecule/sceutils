@@ -98,12 +98,8 @@ def make_func(func, name):
     for i in range(4):
         idc.SetReg(func + i, "T", t_reg)
     idc.MakeFunction(func)
-    idc.MakeName(func, name)
-
-
-def func_flags(func, nid):
-    if nid in NORETURN_NIDS:
-        idc.SetFunctionFlags(func, idc.GetFunctionFlags(func) | idaapi.FUNC_NORET)
+    if name:
+        idc.MakeName(func, name)
 
 
 def add_xrefs():
@@ -205,11 +201,15 @@ class VitaElf:
             suffix = "0x{:08X}".format(nid)
         return "{}.{}.{}".format(prefix, libname, suffix)
 
+    def cb_noret(self, _, func, nid):
+        if nid in NORETURN_NIDS:
+            make_func(func, None)
+            idc.SetFunctionFlags(func, idc.GetFunctionFlags(func) | idaapi.FUNC_NORET)
+
     def cb_exp(self, exp, func, nid):
         name = self.func_get_name("exp", exp.libname, nid)
 
         make_func(func, name)
-        func_flags(func, nid)
 
         self.add_nid_cmt(func, "[Export libnid: 0x{:08X} ({}), NID: 0x{:08X}]".format(exp.libnid, exp.libname, nid))
 
@@ -217,8 +217,7 @@ class VitaElf:
         name = self.func_get_name("imp", imp.libname, nid)
 
         make_func(func, name)
-        idc.SetFunctionFlags(func, idaapi.FUNC_THUNK | idaapi.FUNC_LIB)
-        func_flags(func, nid)
+        idc.SetFunctionFlags(func, idc.GetFunctionFlags(func) | idaapi.FUNC_THUNK | idaapi.FUNC_LIB)
 
         self.add_nid_cmt(func, "[Import libnid: 0x{:08X} ({}), NID: 0x{:08X}]".format(imp.libnid, imp.libname, nid))
 
@@ -249,20 +248,24 @@ class VitaElf:
         self.fin.seek(self.seg0_off + header.e_entry)
         modinfo = Modinfo(self.fin.read(0x34))
 
-        print "2) Parsing export tables"
+        print "2) Doing noreturn functions first"
+        self.parse_impexp(modinfo.export_top, modinfo.export_end, Modexport, self.cb_noret)
+        self.parse_impexp(modinfo.import_top, modinfo.import_end, Modimport, self.cb_noret)
+
+        print "3) Parsing export tables"
         self.parse_impexp(modinfo.export_top, modinfo.export_end, Modexport, self.cb_exp)
 
-        print "3) Parsing import tables"
+        print "4) Parsing import tables"
         self.parse_impexp(modinfo.import_top, modinfo.import_end, Modimport, self.cb_imp)
 
-        print "4) Waiting for IDA to analyze the program"
+        print "5) Waiting for IDA to analyze the program"
         idc.Wait()
 
-        print "5) Analyze system instructions"
+        print "6) Analyzing system instructions"
         from highlight_arm_system_insn import run_script
         run_script()
 
-        print "6) Add MOVT/MOVW pair xrefs"
+        print "6) Adding MOVT/MOVW pair xrefs"
         add_xrefs()
 
 
