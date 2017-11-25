@@ -12,8 +12,9 @@ When opening a Vita `.elf` file, select "PS Vita ELF [vita_loader.py]" (second o
 
 1. Vita ELF loading with import/export parsing
 2. `db.yml` from vitasdk used for NID resolving
-3. System instructions like MRC/MCR are automatically commented
-4. MOVT/MOVW pairs are detected and appropriate xrefs are added
+3. A comment is added to every exported function so you can see if it's exported multiple times using different NIDs/libnids.
+4. System instructions like MRC/MCR are automatically commented
+5. MOVT/MOVW pairs are detected and appropriate xrefs are added
 
 ## Caveats, known bugs, etc
 
