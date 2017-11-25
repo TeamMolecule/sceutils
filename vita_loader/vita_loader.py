@@ -1,7 +1,5 @@
 # check README.md for how to install
 
-# system instructions by gdelugre/ida-arm-system-highlight
-
 import struct
 from collections import defaultdict
 
