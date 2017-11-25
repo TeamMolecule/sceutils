@@ -1,5 +1,6 @@
-# place this script into your IDA/loaders/ directory
-# place a db.yml into the directory with your elfs
+# check README.md for how to install
+
+# system instructions by gdelugre/ida-arm-system-highlight
 
 import struct
 from collections import defaultdict
@@ -214,6 +215,10 @@ class VitaElf:
 
         print "4) Waiting for IDA to analyze the program"
         idc.Wait()
+
+        print "5) Analyze system instructions"
+        from highlight_arm_system_insn import run_script
+        run_script()
 
 
 def load_file(fin, *args, **kwargs):
