@@ -106,6 +106,48 @@ def func_flags(func, nid):
         idc.SetFunctionFlags(func, idc.GetFunctionFlags(func) | idaapi.FUNC_NORET)
 
 
+def add_xrefs():
+    """
+        Searches for MOV / MOVT pair, probably separated by few instructions,
+        and adds xrefs to things that look like addresses
+    """
+    addr = 0
+    while addr != idc.BADADDR:
+        addr = idc.NextHead(addr)
+        if idc.GetMnem(addr) in ["MOV", "MOVW"]:
+            reg = idc.GetOpnd(addr, 0)
+            if idc.GetOpnd(addr, 1)[0] != "#":
+                continue
+            val = idc.GetOperandValue(addr, 1)
+            found = False
+            next_addr = addr
+            for x in range(16):
+                next_addr = idc.NextHead(next_addr)
+                if idc.GetMnem(next_addr) in ["B", "BX"]:
+                    break
+                # TODO: we could handle a lot more situations if we follow branches, but it's getting complicated
+                # if there's a function call and our register is scratch, it will probably get corrupted, bail out
+                if idc.GetMnem(next_addr) in ["BL", "BLX"] and reg in ["R0", "R1", "R2", "R3"]:
+                    break
+                # if we see a MOVT, do the match!
+                if idc.GetMnem(next_addr) in ["MOVT", "MOVT.W"] and idc.GetOpnd(next_addr, 0) == reg:
+                    if idc.GetOpnd(next_addr, 1)[0] == "#":
+                        found = True
+                        val += idc.GetOperandValue(next_addr, 1) * (2 ** 16)
+                    break
+                # if we see something other than MOVT doing something to the register, bail out
+                if idc.GetOpnd(next_addr, 0) == reg or idc.GetOpnd(next_addr, 1) == reg:
+                    break
+            if val & 0xFFFF0000 == 0:
+                continue
+            if found:
+                # pair of MOV/MOVT
+                idc.OpOffEx(next_addr, 1, idc.REF_HIGH16, val, 0, 0)
+            else:
+                # a single MOV instruction
+                idc.OpOff(addr, 1, 0)
+
+
 class VitaElf:
 
     def __init__(self, fin):
@@ -219,6 +261,9 @@ class VitaElf:
         print "5) Analyze system instructions"
         from highlight_arm_system_insn import run_script
         run_script()
+
+        print "6) Add MOVT/MOVW pair xrefs"
+        add_xrefs()
 
 
 def load_file(fin, *args, **kwargs):
