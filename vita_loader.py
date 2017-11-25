@@ -221,7 +221,7 @@ def load_file(fin, neflags, format):
 def accept_file(fin, name):
     fin.seek(0)
     header = fin.read(0x34)
-    if header.startswith("\x7fELF") and u16(header, 0x12) == 0x28:
+    if header.startswith("\x7fELF") and u16(header, 0x10) == 0xFE04:
         return "PS Vita ELF"
 
     return 0
