@@ -6,8 +6,11 @@ from collections import defaultdict
 import os.path
 import glob
 
+from Crypto.Cipher import AES
+
 from util import u32, u8, c_str
 from scedecrypt import scedecrypt
+from self2elf import self2elf
 
 
 SCEUF_HEADER_SIZE = 0x80
@@ -105,9 +108,19 @@ def pup_extract_files(pup, output):
         print "-" * 80
 
 
+def join_files(mask, output):
+    files = sorted(glob.glob(mask))
+    with open(output, "wb") as fout:
+        for filename in files:
+            with open(filename, "rb") as fin:
+                fout.write(fin.read())
+            os.remove(filename)
+
+
 def pup_decrypt_packages(src, dst):
     files = [os.path.basename(x) for x in glob.glob(os.path.join(src, "*.pkg"))]
-    files.extend(["cui_setupper.self"])
+    files.extend(["cui_setupper.self", "psp2swu.self"])
+    files.sort()
 
     for filename in files:
         filepath = os.path.join(src, filename)
@@ -117,6 +130,9 @@ def pup_decrypt_packages(src, dst):
                 print "Decrypted {}".format(filename)
             except KeyError:
                 print "[!] Couldn't decrypt {}".format(filename)
+
+    join_files(os.path.join(dst, "os0-*.pkg.seg02"), os.path.join(dst, "os0.bin"))
+    join_files(os.path.join(dst, "vs0-*.pkg.seg02"), os.path.join(dst, "vs0.bin"))
 
     print "-" * 80
 
@@ -145,6 +161,8 @@ def slb2_extract(src, dst):
 
 
 def enc_decrypt(src, dst):
+    from keys import ENC_KEY, ENC_IV
+
     with open(src, "rb") as fin:
         data = fin.read()
 
@@ -154,14 +172,31 @@ def enc_decrypt(src, dst):
         raise RuntimeError("enc format invalid")
 
     data = data[offset:offset+data_size]
-    # TODO
-
-
+    aes = AES.new(ENC_KEY, AES.MODE_CBC, ENC_IV)
+    with open(dst, "wb") as fout:
+        fout.write(aes.decrypt(data))
 
 
 def slb2_decrypt(src, dst):
     for filename in ["second_loader.enc", "secure_kernel.enc"]:
-        enc_decrypt(os.path.join(src, filename), os.path.join(dst, filename.replace(".enc", ".bin")))
+        dst_filename = filename.replace(".enc", ".bin")
+        enc_decrypt(os.path.join(src, filename), os.path.join(dst, dst_filename))
+        print "Decrypted {} to {}".format(filename, dst_filename)
+
+    for filename in ["kernel_boot_loader.self", "prog_rvk.srvk"]:
+        filepath = os.path.join(src, filename)
+        with open(filepath, "rb") as fin:
+            scedecrypt(fin, dst, silent=True)
+        print "Decrypted {}".format(filename)
+
+    for filename in ["kprx_auth_sm.self"]:
+        dst_filename = filename.replace(".self", ".elf")
+        with open(os.path.join(src, filename), "rb") as fin:
+            with open(os.path.join(dst, dst_filename), "wb") as fout:
+                self2elf(fin, fout, silent=True)
+        print "self2elf {}".format(filename)
+
+    print "-" * 80
 
 
 def extract_pup(pup, output):
