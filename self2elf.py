@@ -9,7 +9,7 @@ from scetypes import SecureBool, SceHeader, SelfHeader, AppInfoHeader, ElfHeader
 from Crypto.Cipher import AES
 from Crypto.Util import Counter
 
-def self2elf(inf, outf=open(os.devnull, "w"), klictxt='0', silent=False):
+def self2elf(inf, outf=open(os.devnull, "w"), klictxt='0', silent=False, ignore_sysver=False):
     npdrmtype=0
     sce = SceHeader(inf.read(SceHeader.Size))
     if not silent:
@@ -17,6 +17,8 @@ def self2elf(inf, outf=open(os.devnull, "w"), klictxt='0', silent=False):
     self_hdr = SelfHeader(inf.read(SelfHeader.Size))
     inf.seek(self_hdr.appinfo_offset)
     appinfo_hdr = AppInfoHeader(inf.read(AppInfoHeader.Size))
+    if ignore_sysver:
+        appinfo_hdr.sys_version = -1
     if not silent:
         print appinfo_hdr
     inf.seek(self_hdr.sceversion_offset)

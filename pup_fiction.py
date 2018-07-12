@@ -121,7 +121,6 @@ def join_files(mask, output):
 
 def pup_decrypt_packages(src, dst):
     files = [os.path.basename(x) for x in glob.glob(os.path.join(src, "*.pkg"))]
-    files.extend(["cui_setupper.self", "psp2swu.self"])
     files.sort()
 
     for filename in files:
@@ -132,6 +131,16 @@ def pup_decrypt_packages(src, dst):
                 print "Decrypted {}".format(filename)
             except KeyError:
                 print "[!] Couldn't decrypt {}".format(filename)
+
+    for filename in ["cui_setupper.self", "psp2swu.self"]:
+        filepath = os.path.join(src, filename)
+        with open(filepath, "rb") as fin:
+            with open(os.path.join(dst, filename.replace(".self", ".elf")), "wb") as fout:
+                try:
+                    self2elf(fin, fout, silent=True, ignore_sysver=True)
+                    print "Decrypted {}".format(filename)
+                except KeyError:
+                    print "[!] Couldn't decrypt {}".format(filename)
 
     join_files(os.path.join(dst, "os0-*.pkg.seg02"), os.path.join(dst, "os0.bin"))
     join_files(os.path.join(dst, "vs0-*.pkg.seg02"), os.path.join(dst, "vs0.bin"))
@@ -217,7 +226,7 @@ def extract_fs(output):
     vs0_tarpatch = os.path.join(output, "fs", "vs0_tarpatch")
     for filename in glob.glob(os.path.join(output, "PUP_dec", "vs0_tarpatch-*.pkg.seg02")):
         print "tarpatch {}".format(os.path.basename(filename))
-        subprocess.call(["7z", "x", filename, "-o{}".format(vs0_tarpatch)])
+        subprocess.call(["7z", "x", filename, "-o{}".format(vs0_tarpatch)], stdout=open(os.devnull, 'wb'), stderr=open(os.devnull, 'wb'))
 
     print "-" * 80
 
