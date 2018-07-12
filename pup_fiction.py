@@ -6,6 +6,7 @@ from collections import defaultdict
 import os.path
 import glob
 import subprocess
+import errno
 
 from Crypto.Cipher import AES
 
@@ -192,10 +193,11 @@ def slb2_decrypt(src, dst):
 
     for filename in ["kprx_auth_sm.self"]:
         dst_filename = filename.replace(".self", ".elf")
+
+        print "self2elf {}".format(filename)
         with open(os.path.join(src, filename), "rb") as fin:
             with open(os.path.join(dst, dst_filename), "wb") as fout:
                 self2elf(fin, fout, silent=True)
-        print "self2elf {}".format(filename)
 
     print "-" * 80
 
@@ -205,12 +207,69 @@ def extract_fs(output):
     os.mkdir(fs_output)
 
     for partition in ["os0", "vs0"]:
+        print "Extract {}".format(partition)
         partition_in = os.path.join(output, "PUP_dec", "{}.bin".format(partition))
         partition_out = os.path.join(fs_output, partition)
         os.mkdir(partition_out)
         subprocess.call(["7z", "x", partition_in, "-o{}".format(partition_out)], stdout=open(os.devnull, 'wb'), stderr=open(os.devnull, 'wb'))
-        print "Extract {}".format(partition)
 
+
+    vs0_tarpatch = os.path.join(output, "fs", "vs0_tarpatch")
+    for filename in glob.glob(os.path.join(output, "PUP_dec", "vs0_tarpatch-*.pkg.seg02")):
+        print "tarpatch {}".format(os.path.basename(filename))
+        subprocess.call(["7z", "x", filename, "-o{}".format(vs0_tarpatch)])
+
+    print "-" * 80
+
+
+def mkdir_p(path):
+    try:
+        os.makedirs(path)
+    except OSError as exc:  # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
+
+
+def decrypt_selfs(in_dir, out_dir, blacklist=None):
+    if not blacklist:
+        blacklist = []
+
+    for root, dirs, files in os.walk(in_dir):
+        for filename in files:
+            name, ext = os.path.splitext(filename)
+            if ext in [".self", ".skprx", ".suprx"] and filename not in blacklist:
+                relpath = os.path.relpath(root, in_dir)
+                mkdir_p(os.path.join(out_dir, relpath))
+
+                print "self2elf {}".format(filename)
+                with open(os.path.join(root, filename), "rb") as fin:
+                    with open(os.path.join(out_dir, relpath, "{}.elf".format(name)), "wb") as fout:
+                        self2elf(fin, fout, silent=True)
+
+
+def decrypt_os0(output):
+    os0_in = os.path.join(output, "fs", "os0")
+    os0_out = os.path.join(output, "fs_dec", "os0")
+
+    configs = ["psp2config_dolce.skprx", "psp2config_vita.skprx", "psp2config.skprx"]
+
+    decrypt_selfs(os0_in, os0_out, configs)
+    for filename in configs:
+        in_path = os.path.join(os0_in, filename)
+        if os.path.exists(in_path):
+            print "Decrypt {}".format(filename)
+            with open(in_path, "rb") as fin:
+                scedecrypt(fin, os0_out, silent=True)
+    print "-" * 80
+
+
+def decrypt_vs0(output):
+    for part in ["vs0", "vs0_tarpatch"]:
+        vs0_in = os.path.join(output, "fs", part)
+        vs0_out = os.path.join(output, "fs_dec", part)
+        decrypt_selfs(vs0_in, vs0_out)
     print "-" * 80
 
 
@@ -243,6 +302,10 @@ def extract_pup(pup, output):
     slb2_decrypt(slb2_dst, slb2_dec)
 
     extract_fs(output)
+
+    os.mkdir(os.path.join(output, "fs_dec"))
+    decrypt_os0(output)
+    decrypt_vs0(output)
 
 
 def main():
