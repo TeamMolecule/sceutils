@@ -5,6 +5,7 @@ import struct
 from collections import defaultdict
 import os.path
 import glob
+import subprocess
 
 from Crypto.Cipher import AES
 
@@ -199,6 +200,20 @@ def slb2_decrypt(src, dst):
     print "-" * 80
 
 
+def extract_fs(output):
+    fs_output = os.path.join(output, "fs")
+    os.mkdir(fs_output)
+
+    for partition in ["os0", "vs0"]:
+        partition_in = os.path.join(output, "PUP_dec", "{}.bin".format(partition))
+        partition_out = os.path.join(fs_output, partition)
+        os.mkdir(partition_out)
+        subprocess.call(["7z", "x", partition_in, "-o{}".format(partition_out)], stdout=open(os.devnull, 'wb'), stderr=open(os.devnull, 'wb'))
+        print "Extract {}".format(partition)
+
+    print "-" * 80
+
+
 def extract_pup(pup, output):
     if os.path.exists(output):
         print "{} already exists, remove it first".format(output)
@@ -226,6 +241,8 @@ def extract_pup(pup, output):
     slb2_dec = os.path.join(output, "SLB2_dec")
     os.mkdir(slb2_dec)
     slb2_decrypt(slb2_dst, slb2_dec)
+
+    extract_fs(output)
 
 
 def main():
