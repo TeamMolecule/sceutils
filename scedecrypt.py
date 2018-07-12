@@ -13,7 +13,7 @@ def scedecrypt(inf, outdir, decompress=True, silent=False):
     if not silent:
         print sce
     (sysver, selftype) = sceutils.get_key_type(inf, sce, silent)
-    scesegs = sceutils.get_segments(inf, sce, sysver, selftype, silent)
+    scesegs = sceutils.get_segments(inf, sce, sysver, selftype, silent=silent)
     for i, sceseg in scesegs.iteritems():
         if not silent:
             print 'Decrypting segment {0}...'.format(i)
