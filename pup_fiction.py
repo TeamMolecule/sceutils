@@ -243,10 +243,14 @@ def decrypt_selfs(in_dir, out_dir, blacklist=None):
                 relpath = os.path.relpath(root, in_dir)
                 mkdir_p(os.path.join(out_dir, relpath))
 
-                print "self2elf {}".format(filename)
-                with open(os.path.join(root, filename), "rb") as fin:
-                    with open(os.path.join(out_dir, relpath, "{}.elf".format(name)), "wb") as fout:
-                        self2elf(fin, fout, silent=True)
+                try:
+                    with open(os.path.join(root, filename), "rb") as fin:
+                        with open(os.path.join(out_dir, relpath, "{}.elf".format(name)), "wb") as fout:
+                            self2elf(fin, fout, silent=True)
+                    print "self2elf {}".format(filename)
+                except KeyError:
+                    print "[!] no key {}".format(filename)
+
 
 
 def decrypt_os0(output):
