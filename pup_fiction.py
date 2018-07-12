@@ -7,6 +7,7 @@ import os.path
 import glob
 import subprocess
 import errno
+import sys
 
 from Crypto.Cipher import AES
 
@@ -14,6 +15,10 @@ from util import u32, u8, c_str
 from scedecrypt import scedecrypt
 from self2elf import self2elf
 
+unarzl_exe = os.path.join(os.path.dirname(os.path.realpath(__file__)), "unarzl", "unarzl")
+if not os.path.exists(unarzl_exe):
+    print "Please cd to unarzl and type make"
+    sys.exit(-1)
 
 SCEUF_HEADER_SIZE = 0x80
 SCEUF_FILEREC_SIZE = 0x20
@@ -207,6 +212,9 @@ def slb2_decrypt(src, dst):
         with open(os.path.join(src, filename), "rb") as fin:
             with open(os.path.join(dst, dst_filename), "wb") as fout:
                 self2elf(fin, fout, silent=True)
+
+    print "unarzl nsbl.bin"
+    subprocess.call([unarzl_exe, os.path.join(dst, "kernel_boot_loader.self.seg03"), os.path.join(dst, "nsbl.bin")])
 
     print "-" * 80
 
