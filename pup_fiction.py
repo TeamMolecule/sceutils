@@ -256,7 +256,7 @@ def decrypt_selfs(in_dir, out_dir, blacklist=None):
     for root, dirs, files in os.walk(in_dir):
         for filename in files:
             name, ext = os.path.splitext(filename)
-            if ext in [".self", ".skprx", ".suprx"] and filename not in blacklist:
+            if (ext in [".self", ".skprx", ".suprx"] or or filename=="eboot.bin") and filename not in blacklist:
                 relpath = os.path.relpath(root, in_dir)
                 mkdir_p(os.path.join(out_dir, relpath))
 
